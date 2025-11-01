@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: research-swarm-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: research-swarm-api
+  template:
+    metadata:
+      labels:
+        app: research-swarm-api
+    spec:
+      containers:
+      - name: api
+        image: research-swarm:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: REDIS_URL
+          value: "redis://redis-service:6379"
+        volumeMounts:
+        - name: outputs
+          mountPath: /app/outputs
+      volumes:
+      - name: outputs
+        persistentVolumeClaim:
+          claimName: research-outputs-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: research-swarm-api-service
+spec:
+  selector:
+    app: research-swarm-api
+  ports:
+  - port: 8000
+    targetPort: 8000
+  type: LoadBalancer
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: research-job-template
+spec:
+  template:
+    spec:
+      containers:
+      - name: research-worker
+        image: research-swarm-worker:latest
+        env:
+        - name: IDEA_ID
+          value: "PLACEHOLDER"
+        - name: PHASE
+          value: "PLACEHOLDER"
+      restartPolicy: OnFailure
+  backoffLimit: 3

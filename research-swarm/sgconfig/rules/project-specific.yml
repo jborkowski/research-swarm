@@ -1,0 +1,64 @@
+# Python-specific rules for the Research Swarm application
+- id: fix-bare-except
+  severity: error
+  language: Python
+  message: 'Bare except clause found. Use specific exception type.'
+  rule:
+    pattern: 'except:'
+
+# Rule to detect potential blocking operations in async functions
+- id: blocking-operation-in-async
+  severity: warning
+  language: Python
+  message: 'Potential blocking operation in async function. Consider using async alternative.'
+  rule:
+    all:
+      - inside:
+          pattern: 'async def $FUNC(...): ...'
+      - any:
+          - pattern: 'await asyncio.to_thread(...)'
+          - pattern: 'time.sleep(...)'
+          - pattern: '$MODULE.run(...)'
+    constraint:
+      $MODULE:
+        not:
+          regex: '^(asyncio|aiohttp)$'
+
+# Rule to detect missing error handling in async calls
+- id: missing-error-handling-in-async
+  severity: warning
+  language: Python
+  message: 'Async call without proper error handling. Consider adding try/except.'
+  rule:
+    all:
+      - inside:
+          pattern: 'async def $FUNC(...): ...'
+      - pattern: 'await $EXPR'
+      - not-inside:
+          pattern: 'try: ... except ...: ...'
+
+# Rule to detect missing type hints in public functions
+- id: missing-type-hints-public
+  severity: warning
+  language: Python
+  message: 'Public function missing type hints. Add for better maintainability.'
+  rule:
+    all:
+      - pattern: 'def $FUNC($$$ARGS): ...'
+      - not: 
+          inside:
+            pattern: 'def $FUNC($$$ARGS) -> $RET: ...'
+      - not:
+          regex: '^_.*' # Ignore private functions
+    inside:
+      pattern: 'class $CLASS(...): ...' # For methods
+    note: 'Consider adding type hints to improve code clarity and maintainability.'
+
+# Rule to detect improper usage of LangChain components
+- id: improper-langchain-usage
+  severity: warning
+  language: Python
+  message: 'Potentially improper LangChain usage. Check documentation.'
+  rule:
+    pattern: '$CLASS(...).run(...)'
+    note: 'Consider using .ainvoke() or .ainvoke_async() for async functions.'

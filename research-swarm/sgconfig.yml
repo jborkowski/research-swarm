@@ -1,0 +1,11 @@
+# ast-grep configuration
+ruleDir: ./sgconfig/rules
+ignore:
+  - node_modules
+  - .git
+  - __pycache__
+  - "*.pyc"
+  - ".venv"
+  - "venv"
+  - "dist"
+  - "build"

@@ -1,0 +1,47 @@
+# Comprehensive Python linting rules for Research Swarm
+rules:
+  # Rule to detect bare except clauses
+  - id: bare-except
+    severity: error
+    language: Python
+    message: 'Bare except clause found. Use specific exception type.'
+    rule:
+      pattern: 'except:'
+
+  # Rule to detect potentially unused imports
+  - id: potentially-unused-import
+    severity: warning
+    language: Python
+    message: 'Import may be unused. Consider removing if not used in file.'
+    rule:
+      pattern: 'import $MOD'
+      not-inside:
+        - pattern: '$MOD'
+        - pattern: '$MOD.$FUNC'
+      note: 'Consider removing unused import to keep code clean.'
+
+  # Rule to detect blocking operations in async functions
+  - id: blocking-operation-in-async
+    severity: warning
+    language: Python
+    message: 'Potential blocking operation in async function.'
+    rule:
+      all:
+        - inside:
+            pattern: 'async def $FUNC(...): ...'
+        - any:
+            - pattern: 'time.sleep(...)'
+            - pattern: 'input(...)'
+      note: 'Use async alternatives to prevent blocking the event loop.'
+
+  # Rule to detect print statements in non-script files
+  - id: print-in-production-code
+    severity: warning
+    language: Python
+    message: 'Print statement found in non-script file. Use logging instead.'
+    rule:
+      all:
+        - pattern: 'print(...)'
+        - not-inside:
+            pattern: 'if __name__ == "__main__": ...'
+      note: 'Consider using logging instead of print for production code.'

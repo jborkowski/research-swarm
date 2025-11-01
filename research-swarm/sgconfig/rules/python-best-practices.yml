@@ -1,0 +1,112 @@
+# Rule to detect bare except clauses
+- id: bare-except
+  severity: warning
+  language: Python
+  message: 'Avoid bare except clauses. Use "except Exception:" instead.'
+  note: 'Bare except clauses catch system-exiting exceptions and should be avoided.'
+  rule:
+    pattern: 'except:'
+
+# Rule to detect print statements in production code
+- id: print-statement
+  severity: warning
+  language: Python
+  message: 'Avoid print statements in production code. Use logging instead.'
+  rule:
+    pattern: 'print(...)'
+
+# Rule to detect f-strings that could be regular strings
+- id: inefficient-fstring
+  severity: info
+  language: Python
+  message: 'F-string without interpolation detected. Consider using a regular string.'
+  rule:
+    pattern: 'f"$WORD"'
+
+# Rule to detect unnecessary pass statements
+- id: unnecessary-pass
+  severity: info
+  language: Python
+  message: 'Unnecessary pass statement detected.'
+  rule:
+    pattern: 'pass'
+    inside:
+      rule:
+        pattern: 'def $FUNC(...): ...'
+
+# Rule to detect global variable usage
+- id: global-variable
+  severity: warning
+  language: Python
+  message: 'Avoid global variable usage. Consider passing as parameters instead.'
+  rule:
+    pattern: 'global $VAR'
+
+# Rule to detect import-star usage
+- id: import-star
+  severity: warning
+  language: Python
+  message: 'Avoid import-star. Use explicit imports instead.'
+  rule:
+    pattern: 'from $MOD import *'
+
+# Rule to detect potentially problematic patterns in our codebase
+- id: non-async-method-in-async-context
+  severity: warning
+  language: Python
+  message: 'Synchronous method call in async function. Consider using async alternative.'
+  rule:
+    all:
+      - inside:
+          rule:
+            pattern: 'async def $FUNC(...): ...'
+      - pattern: '$MODULE.run(...)'
+    note: 'Consider using async alternative to prevent blocking the event loop.'
+
+# Rule to detect raw input usage in async context
+- id: blocking-call-in-async
+  severity: warning
+  language: Python
+  message: 'Blocking call in async function. This will block the event loop.'
+  rule:
+    all:
+      - inside:
+          rule:
+            pattern: 'async def $FUNC(...): ...'
+      - any:
+          - pattern: 'input(...)'
+          - pattern: 'time.sleep(...)'
+          - pattern: 'subprocess.run(...)'
+          - pattern: 'open(...)'
+    note: 'Use async alternatives to prevent blocking the event loop.'
+
+# Rule to detect missing error handling in await calls
+- id: unhandled-await
+  severity: warning
+  language: Python
+  message: 'Potential unhandled exception in await call. Consider adding try/except.'
+  rule:
+    pattern: 'await $EXPR'
+    not-inside: 
+      - pattern: 'try: ... except ...: ...'
+    note: 'Consider handling potential exceptions from this await call.'
+
+# Rule to detect potentially unused variables (starting with underscore)
+- id: potential-unused-var
+  severity: info
+  language: Python
+  message: 'Variable starts with underscore but is used. Consider regular naming.'
+  rule:
+    pattern: '_$VAR'
+    inside:
+      pattern: '$FUNC(_$VAR, ...)'
+
+# Rule to detect missing type hints in function definitions
+- id: missing-return-type-hint
+  severity: warning
+  language: Python
+  message: 'Function missing return type hint. Consider adding for better code clarity.'
+  rule:
+    pattern: 'def $FUNC($$$ARGS): ...'
+    not-inside:
+      - pattern: 'def $FUNC($$$ARGS) -> $RET: ...'

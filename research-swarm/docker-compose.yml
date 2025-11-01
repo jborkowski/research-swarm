@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: research_swarm
+      POSTGRES_USER: swarm
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://swarm:${DB_PASSWORD}@postgres:5432/research_swarm
+    depends_on:
+      - redis
+      - postgres
+    volumes:
+      - ./outputs:/app/outputs
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://swarm:${DB_PASSWORD}@postgres:5432/research_swarm
+    depends_on:
+      - redis
+      - postgres
+    volumes:
+      - ./outputs:/app/outputs
+      - /var/run/docker.sock:/var/run/docker.sock  # For spawning pods
+
+volumes:
+  redis_data:
+  postgres_data:
