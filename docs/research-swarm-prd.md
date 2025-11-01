@@ -1032,10 +1032,10 @@ total: ~$400/month
 
 ### Appendix C: Contact Information
 
-- Product Owner: [Your Name]
-- Technical Lead: [Your Name]
+- Product Owner: [Jonatan Borkowski]
+- Technical Lead: [Jonatan Borkowski]
 - Repository: [GitHub URL]
-- Support: [Email]
+- Support: [jonatan@thebo.me w]
 
 ---
 
