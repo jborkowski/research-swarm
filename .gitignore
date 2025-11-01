@@ -1,0 +1,8 @@
+.aider*
+
+# Environment files with secrets
+config/.env
+
+# LiteLLM cache and logs
+*.db
+*.log
