@@ -1,0 +1,30 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: research-swarm
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: research-swarm
+          __path__: /var/log/research-swarm/*.log
+    pipeline_stages:
+      - match:
+          selector: '{job="research-swarm"}'
+          stages:
+            - json:
+                expressions:
+                  level: levelname
+                  message: message
+                  timestamp: asctime
+            - labels:
+                level:
+                timestamp:

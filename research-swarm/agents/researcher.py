@@ -54,24 +54,11 @@ class ResearchAgent:
         
         return tools
     
-    async def _search_apis(self, query: str) -> str:
-        try:
-            serp_api = SerpAPIWrapper()
-            return serp_api.run(query)
-        except Exception as e:
-            return f"Error searching APIs: {str(e)}"
-    
-    async def _search_code(self, query: str) -> str:
-        try:
-            serp_api = SerpAPIWrapper()
-            return serp_api.run(query)
-        except Exception as e:
-            return f"Error searching code: {str(e)}"
-    
     async def research(self, query: str) -> Dict:
         results = []
         for tool in self.tools:
             try:
+                # Run the synchronous tool function in a thread pool
                 result = await asyncio.to_thread(tool.func, query)
                 results.append({
                     "source": tool.name,
@@ -82,7 +69,7 @@ class ResearchAgent:
                     "source": tool.name,
                     "error": str(e)
                 })
-        
+
         return {
             "agent": self.specialty,
             "query": query,

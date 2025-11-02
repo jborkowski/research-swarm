@@ -45,5 +45,8 @@ class PlannerAgent:
         # Validate and set defaults
         result["complexity"] = result.get("complexity", "medium")
         result["needs_research"] = result.get("needs_research", True)
-        
+
+        # Set feasibility based on score (this will be updated after research)
+        result["feasible"] = result.get("feasibility_score", 0.5) >= 0.5
+
         return result

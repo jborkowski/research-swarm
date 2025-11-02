@@ -54,11 +54,49 @@ class TesterAgent:
         }
     
     async def _run_coverage(self, path: Path) -> Dict:
-        # Placeholder for coverage
-        return {
-            "percentage": 0,
-            "meets_threshold": False
-        }
+        """Run coverage analysis on the code"""
+        try:
+            import coverage
+
+            # Initialize coverage
+            cov = coverage.Coverage(source=[str(path)], omit=["test_*.py", "__pycache__/*"])
+
+            # Start coverage
+            cov.start()
+
+            # Run tests to collect coverage data
+            import subprocess
+            result = subprocess.run(
+                ["python", "-m", "pytest", "-x", "-q"],
+                cwd=path,
+                capture_output=True,
+                text=True
+            )
+
+            # Stop coverage
+            cov.stop()
+            cov.save()
+
+            # Get coverage report
+            total = cov.report()
+
+            return {
+                "percentage": total,
+                "meets_threshold": total >= 70.0
+            }
+        except ImportError:
+            # If coverage is not available, return basic info
+            return {
+                "percentage": 0.0,
+                "meets_threshold": False,
+                "error": "coverage package not available"
+            }
+        except Exception as e:
+            return {
+                "percentage": 0.0,
+                "meets_threshold": False,
+                "error": str(e)
+            }
     
     async def _run_e2e_tests(self, path: Path, requirements: Dict) -> Dict:
         # Generate E2E test based on requirements

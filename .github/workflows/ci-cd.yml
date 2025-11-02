@@ -1,0 +1,203 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+    - name: Cache uv dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/uv
+        key: uv-${{ runner.os }}-${{ hashFiles('research-swarm/pyproject.toml') }}
+        restore-keys: |
+          uv-${{ runner.os }}-
+
+    - name: Install dependencies
+      working-directory: research-swarm
+      run: uv sync
+
+    - name: Run linting
+      working-directory: research-swarm
+      run: |
+        uv run python -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        uv run python -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Run type checking
+      working-directory: research-swarm
+      run: uv run python -m mypy . --ignore-missing-imports
+
+    - name: Run tests
+      working-directory: research-swarm
+      run: |
+        PYTHONPATH=. uv run python -m pytest tests/ -v --cov=. --cov-report=xml
+      env:
+        REDIS_URL: redis://localhost:6379
+        OPENAI_API_KEY: test-key
+        SERPAPI_API_KEY: test-serpapi-key
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./research-swarm/coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata for API image
+      id: meta-api
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push API image
+      uses: docker/build-push-action@v5
+      with:
+        context: research-swarm
+        file: research-swarm/Dockerfile.api
+        push: true
+        tags: ${{ steps.meta-api.outputs.tags }}
+        labels: ${{ steps.meta-api.outputs.labels }}
+
+    - name: Extract metadata for Worker image
+      id: meta-worker
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-worker
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Worker image
+      uses: docker/build-push-action@v5
+      with:
+        context: research-swarm
+        file: research-swarm/Dockerfile.worker
+        push: true
+        tags: ${{ steps.meta-worker.outputs.tags }}
+        labels: ${{ steps.meta-worker.outputs.labels }}
+
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure kubectl
+      uses: azure/k8s-set-context@v3
+      with:
+        method: kubeconfig
+        kubeconfig: ${{ secrets.KUBE_CONFIG_STAGING }}
+
+    - name: Deploy to staging
+      run: |
+        sed -i 's|image: research-swarm:latest|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api:latest|g' research-swarm/k8s/deployment.yaml
+        sed -i 's|image: research-swarm-worker:latest|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-worker:latest|g' research-swarm/k8s/deployment.yaml
+        kubectl apply -f research-swarm/k8s/
+
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure kubectl
+      uses: azure/k8s-set-context@v3
+      with:
+        method: kubeconfig
+        kubeconfig: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
+
+    - name: Deploy to production
+      run: |
+        sed -i 's|image: research-swarm:latest|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api:latest|g' research-swarm/k8s/deployment.yaml
+        sed -i 's|image: research-swarm-worker:latest|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-worker:latest|g' research-swarm/k8s/deployment.yaml
+        kubectl apply -f research-swarm/k8s/
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'

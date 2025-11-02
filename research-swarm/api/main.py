@@ -1,12 +1,16 @@
-from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Response
 from pydantic import BaseModel
 from typing import Optional
 import uuid
 from datetime import datetime, timedelta
 from redis import Redis
 import json
+import psutil
+import os
 
 from config.settings import settings
+from utils.metrics import MetricsCollector
+from prometheus_client import generate_latest
 
 app = FastAPI(title="Research Swarm API")
 redis_client = Redis.from_url(settings.redis_url)
@@ -45,8 +49,9 @@ async def submit_idea(
     # Queue for processing
     redis_client.lpush("idea_queue", json.dumps(job_data))
     
-    # Store metadata
-    redis_client.hset(f"idea:{idea_id}", mapping=job_data)
+    # Store metadata (filter out None values for Redis compatibility)
+    filtered_job_data = {k: v for k, v in job_data.items() if v is not None}
+    redis_client.hset(f"idea:{idea_id}", mapping=filtered_job_data)
     
     # Calculate estimated completion
     queue_length = redis_client.llen("idea_queue")
@@ -73,6 +78,43 @@ async def get_idea_status(idea_id: str):
         "progress_percentage": int(data.get(b"progress", 0)),
         "result_url": data.get(b"result_url", b"").decode() or None
     }
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring"""
+    try:
+        # Check Redis connectivity
+        redis_client.ping()
+
+        # Get system metrics
+        cpu_percent = psutil.cpu_percent(interval=1)
+        memory = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+
+        # Update metrics
+        MetricsCollector.update_active_pods(1)  # This would be dynamic in K8s
+
+        return {
+            "status": "healthy",
+            "timestamp": datetime.utcnow().isoformat(),
+            "version": "1.0.0",
+            "services": {
+                "redis": "connected",
+                "api": "running"
+            },
+            "system": {
+                "cpu_percent": cpu_percent,
+                "memory_percent": memory.percent,
+                "disk_percent": disk.percent
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Service unhealthy: {str(e)}")
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint"""
+    return Response(content=generate_latest(), media_type="text/plain; version=0.0.4; charset=utf-8")
 
 if __name__ == "__main__":
     import uvicorn

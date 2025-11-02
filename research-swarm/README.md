@@ -38,10 +38,10 @@ The system consists of several main components:
 ## Setup
 
 1. Clone the repository
-2. Install dependencies: `pip install -r requirements.txt`
-3. Set up virtual environment (recommended): 
-   - Option A: `python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt`
-   - Option B: Using uv: `uv venv && source .venv/bin/activate && uv pip install -r requirements.txt`
+2. Install dependencies: `pip install -r pyproject.toml` or `uv pip install -r pyproject.toml`
+3. Set up virtual environment (recommended):
+   - Option A: `python3 -m venv venv && source venv/bin/activate && pip install -r pyproject.toml`
+   - Option B: Using uv: `uv venv && source .venv/bin/activate && uv pip install -r pyproject.toml`
 4. Set up environment variables in `.env` file:
    ```
    OPENAI_API_KEY=your-openai-key

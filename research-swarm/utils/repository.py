@@ -174,7 +174,7 @@ List of sources and references used in the research.
 {len(artifacts)} files generated
 
 ## Setup Instructions
-1. Install dependencies: `pip install -r requirements.txt`
+1. Install dependencies: `pip install -r pyproject.toml` or `uv pip install -r pyproject.toml`
 2. Run the application: `python main.py`
 
 ## Files

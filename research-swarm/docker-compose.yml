@@ -36,19 +36,67 @@ services:
       - ./outputs:/app/outputs
 
   worker:
-    build:
-      context: .
-      dockerfile: Dockerfile.worker
-    environment:
-      - REDIS_URL=redis://redis:6379
-      - DATABASE_URL=postgresql://swarm:${DB_PASSWORD}@postgres:5432/research_swarm
-    depends_on:
-      - redis
-      - postgres
+     build:
+       context: .
+       dockerfile: Dockerfile.worker
+     environment:
+       - REDIS_URL=redis://redis:6379
+       - DATABASE_URL=postgresql://swarm:${DB_PASSWORD}@postgres:5432/research_swarm
+       - REPO_PATH=/app/outputs
+     depends_on:
+       - redis
+       - postgres
+     volumes:
+       - ./outputs:/app/outputs
+       - /var/run/docker.sock:/var/run/docker.sock  # For spawning pods
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
     volumes:
-      - ./outputs:/app/outputs
-      - /var/run/docker.sock:/var/run/docker.sock  # For spawning pods
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - prometheus
+
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./monitoring/loki-config.yml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+
+  promtail:
+    image: grafana/promtail:latest
+    volumes:
+      - ./logs:/var/log/research-swarm
+      - ./monitoring/promtail-config.yml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
 
 volumes:
   redis_data:
   postgres_data:
+  prometheus_data:
+  grafana_data:
+  loki_data:

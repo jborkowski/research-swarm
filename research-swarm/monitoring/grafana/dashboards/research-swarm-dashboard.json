@@ -1,0 +1,85 @@
+{
+  "id": null,
+  "title": "Research Swarm Monitoring",
+  "tags": ["research-swarm"],
+  "timezone": "browser",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Ideas Processed",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "ideas_processed_total",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": 2,
+      "title": "Failed Ideas",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "ideas_failed_total",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      }
+    }
+  ],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "refresh": "5s",
+  "schemaVersion": 27,
+  "version": 0,
+  "links": []
+}
